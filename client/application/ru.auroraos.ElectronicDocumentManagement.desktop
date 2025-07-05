@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+X-Nemo-Application-Type=silica-qt5
+Icon=ru.auroraos.ElectronicDocumentManagement
+Exec=/usr/bin/ru.auroraos.ElectronicDocumentManagement
+Name=Electronic Document Management
+Name[ru]=Электронный документооборот
+
+[X-Application]
+Permissions=UserDirs;RemovableMedia;MediaIndexing;Internet
+OrganizationName=ru.auroraos
+ApplicationName=ElectronicDocumentManagement
+ExecDBus=/usr/bin/ru.auroraos.ElectronicDocumentManagement

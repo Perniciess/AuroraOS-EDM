@@ -1,0 +1,38 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+AllowShortFunctionsOnASingleLine: Empty
+AlwaysBreakAfterDefinitionReturnType: None
+BinPackParameters: false
+BinPackArguments: false
+
+AccessModifierOffset: -2
+SpacesInAngles: false
+SpaceAfterCStyleCast: true
+Cpp11BracedListStyle: true
+Standard: c++11
+
+SortIncludes: true
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^".*\.h"'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*'
+    Priority:        3
+    SortPriority:    0
+    CaseSensitive:   false
+---
