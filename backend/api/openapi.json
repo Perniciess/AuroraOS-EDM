@@ -1,0 +1,83 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AuroraOS EDM API",
+    "version": "0.1.0",
+    "description": "Initial server foundation. Business endpoints and database readiness are not implemented yet."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "HTTP process liveness; does not check database readiness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "HTTP process is running",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": { "status": { "type": "string", "enum": ["ok"] } }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "headers": {
+      "RequestID": {
+        "description": "Request correlation identifier, also present in error responses",
+        "schema": { "type": "string", "minLength": 1 }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "request_id"],
+            "additionalProperties": false,
+            "properties": {
+              "code": { "type": "string", "minLength": 1 },
+              "message": { "type": "string", "minLength": 1 },
+              "request_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Unknown path: error.code is not_found (404)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "MethodNotAllowed": {
+        "description": "Unsupported method on a known path: error.code is method_not_allowed (405)",
+        "headers": {
+          "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+          "Allow": { "description": "Supported HTTP methods", "schema": { "type": "string" } }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "InternalError": {
+        "description": "Internal failure: error.code is internal_error (500)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}
