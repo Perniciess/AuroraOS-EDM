@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Perniciess/AuroraOS-EDM/backend/internal/documents"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -23,7 +24,7 @@ type APIError struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, accounts Authenticator) http.Handler {
+func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, accounts Authenticator, docs documents.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(observe(logger))
@@ -31,6 +32,10 @@ func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, a
 	r.Post("/api/v1/auth/login", loginHandler(accounts))
 	r.Post("/api/v1/auth/logout", sessionHandler(accounts, true))
 	r.Get("/api/v1/me", sessionHandler(accounts, false))
+	r.Get("/api/v1/assignments", documentHandler(accounts, docs, "assignments"))
+	r.Get("/api/v1/assignments/{id}", documentHandler(accounts, docs, "assignment"))
+	r.Get("/api/v1/documents/{id}", documentHandler(accounts, docs, "document"))
+	r.Get("/api/v1/documents/{id}/versions/{versionID}", documentHandler(accounts, docs, "version"))
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`

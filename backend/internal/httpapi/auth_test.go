@@ -22,7 +22,7 @@ import (
 )
 
 func TestLoginInput(t *testing.T) {
-	router := NewRouter(slog.New(slog.NewJSONHandler(io.Discard, nil)), nil, nil)
+	router := NewRouter(slog.New(slog.NewJSONHandler(io.Discard, nil)), nil, nil, nil)
 	for _, tt := range []struct {
 		body, contentType string
 		status            int
@@ -76,7 +76,7 @@ func TestAccountsIntegration(t *testing.T) {
 	}
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	router := NewRouter(logger, db.PingContext, service)
+	router := NewRouter(logger, db.PingContext, service, postgres.Documents{DB: db})
 	call := func(method, path, body, token string, status int) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
@@ -174,7 +174,7 @@ func TestAccountsIntegration(t *testing.T) {
 	call("POST", "/api/v1/auth/logout", "", independent.AccessToken, 204)
 	call("GET", "/api/v1/me", "", session.AccessToken, 200)
 	// Sessions survive a new service/router instance (process restart).
-	router = NewRouter(logger, db.PingContext, auth.New(store))
+	router = NewRouter(logger, db.PingContext, auth.New(store), postgres.Documents{DB: db})
 	call("GET", "/api/v1/me", "", session.AccessToken, 200)
 	if _, err := db.ExecContext(ctx, "UPDATE edm.users SET disabled = true WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestAccountsIntegration(t *testing.T) {
 	if err := closedDB.Close(); err != nil {
 		t.Fatal(err)
 	}
-	router = NewRouter(logger, db.PingContext, auth.New(postgres.Accounts{DB: closedDB}))
+	router = NewRouter(logger, db.PingContext, auth.New(postgres.Accounts{DB: closedDB}), postgres.Documents{DB: closedDB})
 	call("GET", "/api/v1/me", "", session.AccessToken, 500)
 	login(username, password, 500)
 }

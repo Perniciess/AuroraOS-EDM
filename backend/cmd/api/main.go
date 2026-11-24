@@ -46,7 +46,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger, db.PingContext, auth.New(postgres.Accounts{DB: db})),
+		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger, db.PingContext, auth.New(postgres.Accounts{DB: db}), postgres.Documents{DB: db}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

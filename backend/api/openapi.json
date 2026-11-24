@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "AuroraOS EDM API",
-    "version": "0.2.0",
-    "description": "Pilot accounts and PostgreSQL-backed bearer sessions. HTTPS is required outside local development. Accounts are provisioned using edmctl; public registration is not available. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
+    "version": "0.3.0",
+    "description": "Pilot accounts, PostgreSQL-backed bearer sessions and assignment-scoped document metadata. HTTPS is required outside local development. Accounts are provisioned using edmctl; public registration is not available. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -63,6 +63,71 @@
         }
       }
     },
+    "/api/v1/assignments": {
+      "get": {
+        "operationId": "listAssignments",
+        "summary": "List the current user's pending assignments",
+        "description": "Only pending assignments are visible. UUID ascending keyset pagination; next_after is omitted on the last page. Pass next_after as after on the next request. Each page reflects current grants, not a snapshot or a synchronization cursor; new assignments with smaller UUIDs require a fresh listing. Ownership always comes from the session; extra query parameters cannot change the assignee. Cache-Control: no-store.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+          { "name": "after", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Exclusive assignment ID cursor. Omit to start again." }
+        ],
+        "responses": {
+          "200": { "description": "Bounded page; items is an empty array for an empty inbox. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentPage" } } } },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/assignments/{id}": {
+      "get": {
+        "operationId": "getAssignment",
+        "summary": "Read an owned pending assignment",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ObjectID" }],
+        "responses": {
+          "200": { "description": "Assignment bound to one exact version. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}": {
+      "get": {
+        "operationId": "getDocument",
+        "summary": "Read a document card through a pending assignment",
+        "description": "Requires a pending assignment to at least one version of this document. Does not enumerate or grant access to other versions.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ObjectID" }],
+        "responses": {
+          "200": { "description": "Document card. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Document" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions/{versionID}": {
+      "get": {
+        "operationId": "getDocumentVersion",
+        "summary": "Read metadata of an assigned immutable PDF version",
+        "description": "Requires a pending assignment to this exact version and a matching document ID. Returns metadata only, not file bytes or a storage path. Cancelling the last applicable assignment removes access on the next request.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectID" },
+          { "name": "versionID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Immutable version metadata. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentVersion" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "getHealth",
@@ -116,6 +181,9 @@
     }
   },
   "components": {
+    "parameters": {
+      "ObjectID": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
     "securitySchemes": {
       "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Opaque 32-byte random token, unpadded base64url (43 characters). Not JWT; never send in query parameters." }
     },
@@ -126,6 +194,45 @@
       }
     },
     "schemas": {
+      "Document": {
+        "type": "object", "required": ["id", "title", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DocumentVersion": {
+        "type": "object", "required": ["id", "document_id", "number", "media_type", "size_bytes", "checksum_algorithm", "checksum", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "document_id": { "type": "string", "format": "uuid" },
+          "number": { "type": "integer", "format": "int64", "minimum": 1 },
+          "media_type": { "type": "string", "enum": ["application/pdf"] },
+          "size_bytes": { "type": "integer", "format": "int64", "minimum": 1 },
+          "checksum_algorithm": { "type": "string", "enum": ["sha256"] },
+          "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Assignment": {
+        "type": "object", "required": ["id", "document_id", "version_id", "status", "revision", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "document_id": { "type": "string", "format": "uuid" },
+          "version_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["pending"] },
+          "revision": { "type": "integer", "format": "int64", "minimum": 1 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AssignmentPage": {
+        "type": "object", "required": ["items"], "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Assignment" } },
+          "next_after": { "type": "string", "format": "uuid" }
+        }
+      },
       "User": {
         "type": "object", "required": ["id", "username"], "additionalProperties": false,
         "properties": { "id": { "type": "string", "format": "uuid" }, "username": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{2,63}$" } }
@@ -159,7 +266,7 @@
     },
     "responses": {
       "InvalidRequest": {
-        "description": "Malformed JSON, unknown properties or more than one JSON value: error.code is invalid_request",
+        "description": "Malformed login JSON, unknown login properties, more than one JSON value, invalid or repeated pagination parameters: error.code is invalid_request",
         "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
@@ -189,7 +296,7 @@
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
       "NotFound": {
-        "description": "Unknown path: error.code is not_found (404)",
+        "description": "Unknown path, malformed object UUID, missing object, another user's object, cancelled assignment or unassigned version: identical error.code not_found and message Resource not found (404)",
         "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
