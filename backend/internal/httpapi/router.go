@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -22,7 +23,7 @@ type APIError struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewRouter(logger *slog.Logger) http.Handler {
+func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(observe(logger))
@@ -35,8 +36,19 @@ func NewRouter(logger *slog.Logger) http.Handler {
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "Resource not found")
 	})
+	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := checkDatabase(ctx); err != nil {
+			writeError(w, r, http.StatusServiceUnavailable, "not_ready", "Service is not ready")
+			return
+		}
+		writeJSON(w, http.StatusOK, struct {
+			Status string `json:"status"`
+		}{Status: "ok"})
+	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		// The only current resource is /healthz; extend this with new routes.
+		// Both current technical resources support GET only.
 		w.Header().Set("Allow", http.MethodGet)
 		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed")
 	})

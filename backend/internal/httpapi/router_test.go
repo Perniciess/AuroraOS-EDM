@@ -4,7 +4,9 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -23,12 +25,14 @@ func TestRouterResponsesAndLogs(t *testing.T) {
 		code         string
 	}{
 		{http.MethodGet, "/healthz", http.StatusOK, ""},
+		{http.MethodGet, "/readyz", http.StatusOK, ""},
+		{http.MethodPost, "/readyz", http.StatusMethodNotAllowed, "method_not_allowed"},
 		{http.MethodGet, "/missing?token=secret-query", http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/healthz", http.StatusMethodNotAllowed, "method_not_allowed"},
 	} {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			var logs bytes.Buffer
-			router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)))
+			router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)), func(context.Context) error { return nil })
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(tt.method, tt.path, nil))
 			if recorder.Code != tt.status {
@@ -66,6 +70,36 @@ func TestRouterResponsesAndLogs(t *testing.T) {
 				t.Fatalf("unexpected request log: %s", &logs)
 			}
 		})
+	}
+}
+
+func TestDatabaseUnavailable(t *testing.T) {
+	var logs bytes.Buffer
+	router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)), func(ctx context.Context) error {
+		if _, ok := ctx.Deadline(); !ok {
+			t.Error("database check has no deadline")
+		}
+		return errors.New("secret-database-error")
+	})
+	for _, path := range []string{"/readyz", "/healthz"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if path == "/healthz" {
+			if recorder.Code != http.StatusOK {
+				t.Fatal("liveness depends on database")
+			}
+			continue
+		}
+		var body ErrorResponse
+		if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if recorder.Code != http.StatusServiceUnavailable || body.Error.Code != "not_ready" || body.Error.RequestID == "" {
+			t.Fatalf("unexpected readiness response: %d %s", recorder.Code, recorder.Body)
+		}
+		if strings.Contains(recorder.Body.String()+logs.String(), "secret-database-error") {
+			t.Fatal("database error leaked")
+		}
 	}
 }
 

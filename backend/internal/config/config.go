@@ -7,11 +7,14 @@ import (
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Config struct {
 	HTTPAddr        string
 	ShutdownTimeout time.Duration
+	DatabaseURL     string
 }
 
 // Load reads environment settings without loading files or logging their values.
@@ -33,6 +36,14 @@ func Load(getenv func(string) string) (Config, error) {
 		if err != nil || cfg.ShutdownTimeout <= 0 {
 			return Config{}, fmt.Errorf("SHUTDOWN_TIMEOUT must be a positive duration")
 		}
+	}
+	cfg.DatabaseURL = getenv("DATABASE_URL")
+	if cfg.DatabaseURL == "" {
+		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	if _, err := pgx.ParseConfig(cfg.DatabaseURL); err != nil {
+		// Parser errors may include the connection string and password.
+		return Config{}, fmt.Errorf("DATABASE_URL must be a valid PostgreSQL connection string")
 	}
 	return cfg, nil
 }

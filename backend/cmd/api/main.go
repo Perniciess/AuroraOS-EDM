@@ -15,6 +15,7 @@ import (
 
 	"github.com/Perniciess/AuroraOS-EDM/backend/internal/config"
 	"github.com/Perniciess/AuroraOS-EDM/backend/internal/httpapi"
+	"github.com/Perniciess/AuroraOS-EDM/backend/internal/postgres"
 )
 
 func main() {
@@ -32,8 +33,19 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	db, err := postgres.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	migrationCtx, cancelMigrations := context.WithTimeout(ctx, 30*time.Second)
+	err = postgres.Migrate(migrationCtx, db)
+	cancelMigrations()
+	if err != nil {
+		return err
+	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger),
+		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger, db.PingContext),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

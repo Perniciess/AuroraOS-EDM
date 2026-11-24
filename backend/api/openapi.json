@@ -3,7 +3,7 @@
   "info": {
     "title": "AuroraOS EDM API",
     "version": "0.1.0",
-    "description": "Initial server foundation. Business endpoints and database readiness are not implemented yet."
+    "description": "Server foundation with PostgreSQL and separate liveness/readiness checks. Business endpoints are not implemented yet."
   },
   "paths": {
     "/healthz": {
@@ -28,6 +28,31 @@
               }
             }
           },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Database readiness; checks PostgreSQL with a two-second timeout",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "PostgreSQL is available; startup migrations have completed",
+            "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": { "status": { "type": "string", "enum": ["ok"] } }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/NotReady" },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
@@ -60,6 +85,11 @@
       }
     },
     "responses": {
+      "NotReady": {
+        "description": "PostgreSQL unavailable or check timed out: error.code is not_ready (503)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
       "NotFound": {
         "description": "Unknown path: error.code is not_found (404)",
         "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
