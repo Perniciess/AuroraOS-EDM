@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Perniciess/AuroraOS-EDM/backend/internal/auth"
 	"github.com/Perniciess/AuroraOS-EDM/backend/internal/config"
 	"github.com/Perniciess/AuroraOS-EDM/backend/internal/httpapi"
 	"github.com/Perniciess/AuroraOS-EDM/backend/internal/postgres"
@@ -45,7 +46,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger, db.PingContext),
+		Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logger, db.PingContext, auth.New(postgres.Accounts{DB: db})),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

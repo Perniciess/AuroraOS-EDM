@@ -2,10 +2,67 @@
   "openapi": "3.0.3",
   "info": {
     "title": "AuroraOS EDM API",
-    "version": "0.1.0",
-    "description": "Server foundation with PostgreSQL and separate liveness/readiness checks. Business endpoints are not implemented yet."
+    "version": "0.2.0",
+    "description": "Pilot accounts and PostgreSQL-backed bearer sessions. HTTPS is required outside local development. Accounts are provisioned using edmctl; public registration is not available. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
   },
   "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Authenticate and create a 24-hour session",
+        "description": "Username is trimmed and lowercased (ASCII). Maximum JSON body size is 8192 bytes. Ten login attempts per normalized username per 15-minute window, shared across instances and including successful attempts. Password checks are additionally concurrency-limited per process. Missing, invalid, unknown and disabled credentials return the same 401 response.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object", "required": ["username", "password"], "additionalProperties": false,
+            "properties": {
+              "username": { "type": "string", "description": "Canonical form: [a-z0-9][a-z0-9_.-]{2,63}" },
+              "password": { "type": "string", "format": "password", "writeOnly": true, "description": "1–1024 UTF-8 bytes for login; new accounts require at least 12 bytes. No trimming or Unicode normalization." }
+            }
+          } } }
+        },
+        "responses": {
+          "200": {
+            "description": "New independent session; token is returned only here. Cache-Control: no-store.",
+            "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/BodyTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Revoke the supplied session",
+        "description": "Idempotent: a well-formed token already expired, unknown or revoked also returns 204. Other sessions are unaffected. A lost login response requires a fresh login; login itself is not idempotent.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Session absent or revoked. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Return the account for an active session",
+        "description": "Checks session expiry and account disabled state in PostgreSQL on every request. No user identifier is accepted from the client.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Current user. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "getHealth",
@@ -59,6 +116,9 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Opaque 32-byte random token, unpadded base64url (43 characters). Not JWT; never send in query parameters." }
+    },
     "headers": {
       "RequestID": {
         "description": "Request correlation identifier, also present in error responses",
@@ -66,6 +126,19 @@
       }
     },
     "schemas": {
+      "User": {
+        "type": "object", "required": ["id", "username"], "additionalProperties": false,
+        "properties": { "id": { "type": "string", "format": "uuid" }, "username": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{2,63}$" } }
+      },
+      "Session": {
+        "type": "object", "required": ["access_token", "token_type", "expires_at", "user"], "additionalProperties": false,
+        "properties": {
+          "access_token": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{43}$" },
+          "token_type": { "type": "string", "enum": ["Bearer"] },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
       "Error": {
         "type": "object",
         "required": ["error"],
@@ -85,6 +158,31 @@
       }
     },
     "responses": {
+      "InvalidRequest": {
+        "description": "Malformed JSON, unknown properties or more than one JSON value: error.code is invalid_request",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Invalid credentials, missing/malformed bearer header, unknown/revoked/expired session or disabled account: error.code is unauthorized",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" }, "WWW-Authenticate": { "schema": { "type": "string", "enum": ["Bearer"] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "BodyTooLarge": {
+        "description": "Login request exceeds 8192 bytes: error.code is body_too_large",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "UnsupportedMediaType": {
+        "description": "Login requires application/json: error.code is unsupported_media_type",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "Login attempt quota or password-check concurrency exhausted: error.code is rate_limited",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" }, "Retry-After": { "description": "Conservative retry delay in seconds", "schema": { "type": "integer", "enum": [900] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
       "NotReady": {
         "description": "PostgreSQL unavailable or check timed out: error.code is not_ready (503)",
         "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },

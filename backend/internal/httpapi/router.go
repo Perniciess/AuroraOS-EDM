@@ -23,11 +23,14 @@ type APIError struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error) http.Handler {
+func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, accounts Authenticator) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(observe(logger))
 	r.Use(recoverPanic(logger))
+	r.Post("/api/v1/auth/login", loginHandler(accounts))
+	r.Post("/api/v1/auth/logout", sessionHandler(accounts, true))
+	r.Get("/api/v1/me", sessionHandler(accounts, false))
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`
@@ -48,8 +51,11 @@ func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error) h
 		}{Status: "ok"})
 	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		// Both current technical resources support GET only.
-		w.Header().Set("Allow", http.MethodGet)
+		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/logout" {
+			w.Header().Set("Allow", http.MethodPost)
+		} else {
+			w.Header().Set("Allow", http.MethodGet)
+		}
 		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed")
 	})
 	return r

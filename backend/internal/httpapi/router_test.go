@@ -32,7 +32,7 @@ func TestRouterResponsesAndLogs(t *testing.T) {
 	} {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			var logs bytes.Buffer
-			router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)), func(context.Context) error { return nil })
+			router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)), func(context.Context) error { return nil }, nil)
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(tt.method, tt.path, nil))
 			if recorder.Code != tt.status {
@@ -80,7 +80,7 @@ func TestDatabaseUnavailable(t *testing.T) {
 			t.Error("database check has no deadline")
 		}
 		return errors.New("secret-database-error")
-	})
+	}, nil)
 	for _, path := range []string{"/readyz", "/healthz"} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
