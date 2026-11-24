@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "AuroraOS EDM API",
-    "version": "0.3.0",
-    "description": "Pilot accounts, PostgreSQL-backed bearer sessions and assignment-scoped document metadata. HTTPS is required outside local development. Accounts are provisioned using edmctl; public registration is not available. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
+    "version": "0.4.0",
+    "description": "Pilot accounts, PostgreSQL-backed bearer sessions, assignment-scoped metadata and streaming PDF downloads. HTTPS is required outside local development. Accounts, PDF imports and assignments are provisioned using edmctl; public registration and HTTP upload are not available. Imports are limited to 100 MiB, perform header/EOF checks (not full PDF structure validation) and compute SHA-256. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -124,6 +124,52 @@
           "200": { "description": "Immutable version metadata. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentVersion" } } } },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions/{versionID}/content": {
+      "get": {
+        "operationId": "downloadDocumentVersion",
+        "summary": "Stream the exact assigned immutable PDF, with byte-range resume",
+        "description": "Checks the active session and a pending assignment to this exact document/version on every request, including conditional/range requests. Revocation takes effect on the next request; an already started response is not recalled. Maximum stored file size is 104857600 bytes. Download context is limited to 25 seconds (server write timeout 30 seconds); interrupted responses must be resumed/retried and verified against the metadata size and SHA-256 before use. A missing blob behind accessible metadata is an internal error, not 404. Cache-Control: no-store; Content-Disposition uses the version UUID, never a supplied filename. If-Range accepts the strong SHA-256 ETag; a mismatch returns the full file. HTTP upload is intentionally absent in this pilot.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectID" },
+          { "name": "versionID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Range", "in": "header", "schema": { "type": "string" }, "description": "HTTP byte range, e.g. bytes=1048576-. Each retry rechecks access." },
+          { "name": "If-Range", "in": "header", "schema": { "type": "string" }, "description": "Quoted SHA-256 ETag of the partial local file." },
+          { "name": "If-Match", "in": "header", "schema": { "type": "string" } },
+          { "name": "If-None-Match", "in": "header", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete PDF. X-Content-Type-Options: nosniff; Cache-Control: no-store; Content-Disposition: attachment with UUID filename.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+              "ETag": { "schema": { "type": "string" }, "description": "Strong ETag: quoted lowercase SHA-256." },
+              "Accept-Ranges": { "schema": { "type": "string", "enum": ["bytes"] } },
+              "Content-Length": { "schema": { "type": "integer", "format": "int64" } }
+            },
+            "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "206": {
+            "description": "Requested byte range, or multipart/byteranges for multiple ranges. Same immutable ETag and no-store policy as 200.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+              "ETag": { "schema": { "type": "string" } },
+              "Content-Range": { "schema": { "type": "string" }, "description": "bytes START-END/TOTAL for a single range." }
+            },
+            "content": {
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } },
+              "multipart/byteranges": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "304": { "description": "If-None-Match matched the immutable ETag; no body. Session and object rights were checked." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "description": "If-Match failed: error.code is precondition_failed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "416": { "description": "Invalid or unsatisfiable byte range: error.code is invalid_range.", "headers": { "Content-Range": { "schema": { "type": "string" }, "description": "bytes */TOTAL when the range is beyond the file." } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }

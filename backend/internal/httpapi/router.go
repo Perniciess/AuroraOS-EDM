@@ -24,7 +24,7 @@ type APIError struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, accounts Authenticator, docs documents.Reader) http.Handler {
+func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, accounts Authenticator, docs documents.Reader, files ...ContentReader) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(observe(logger))
@@ -36,6 +36,9 @@ func NewRouter(logger *slog.Logger, checkDatabase func(context.Context) error, a
 	r.Get("/api/v1/assignments/{id}", documentHandler(accounts, docs, "assignment"))
 	r.Get("/api/v1/documents/{id}", documentHandler(accounts, docs, "document"))
 	r.Get("/api/v1/documents/{id}/versions/{versionID}", documentHandler(accounts, docs, "version"))
+	if len(files) > 0 {
+		r.Get("/api/v1/documents/{id}/versions/{versionID}/content", contentHandler(accounts, files[0]))
+	}
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`
