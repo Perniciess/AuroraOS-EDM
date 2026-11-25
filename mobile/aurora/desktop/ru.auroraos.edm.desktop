@@ -9,6 +9,6 @@ Exec=/usr/bin/ru.auroraos.edm
 X-Nemo-Application-Type=silica-qt5
 
 [X-Application]
-Permissions=Internet
+Permissions=Internet;UserDirs;DeviceInfo;RemovableMedia
 OrganizationName=ru.auroraos
 ApplicationName=edm

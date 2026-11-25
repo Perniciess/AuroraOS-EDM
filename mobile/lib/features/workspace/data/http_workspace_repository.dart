@@ -16,6 +16,7 @@ class HttpWorkspaceRepository implements WorkspaceRepository {
     return Session(
       token: json['access_token'] as String,
       username: user['username'] as String,
+      userId: user['id'] as String,
       expiresAt: DateTime.parse(json['expires_at'] as String),
     );
   }
@@ -50,6 +51,9 @@ class HttpWorkspaceRepository implements WorkspaceRepository {
     final document = await _api.request('GET', documentPath, token: token);
     final version = await _api.request('GET',
       '$documentPath/versions/${Uri.encodeComponent(assignment.versionId)}', token: token);
+    if (version['checksum_algorithm'] != 'sha256' || version['media_type'] != 'application/pdf') {
+      throw const ApiFailure('Сервер вернул неподдерживаемый формат версии документа.');
+    }
     return DocumentDetails(
       title: document['title'] as String,
       version: version['number'] as int,

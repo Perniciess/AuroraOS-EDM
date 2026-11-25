@@ -1,9 +1,10 @@
 class Session {
-  const Session({required this.token, required this.username, required this.expiresAt});
+  const Session({required this.token, required this.username, required this.expiresAt, this.userId = ''});
 
   final String token;
   final String username;
   final DateTime expiresAt;
+  final String userId;
 }
 
 class Assignment {
@@ -49,4 +50,12 @@ abstract interface class WorkspaceRepository {
   Future<AssignmentPage> assignments(String token, {String? after});
   Future<DocumentDetails> details(String token, Assignment assignment);
   void close();
+}
+
+/// Optional persistent capabilities, kept separate from the remote API contract.
+abstract interface class OfflineWorkspace {
+  bool get offline;
+  Future<Session?> restoreSession();
+  Future<String> preparePdf(String token, Assignment assignment,
+      DocumentDetails details, void Function(int) onProgress);
 }

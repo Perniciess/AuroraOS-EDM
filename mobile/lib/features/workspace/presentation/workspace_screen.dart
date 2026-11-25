@@ -4,6 +4,7 @@ import '../../../core/api_client.dart';
 import '../application/workspace_controller.dart';
 import '../domain/workspace_repository.dart';
 import 'common.dart';
+import 'pdf_screen.dart';
 
 class WorkspaceScreen extends StatelessWidget {
   const WorkspaceScreen({super.key, required this.controller});
@@ -50,6 +51,10 @@ class WorkspaceScreen extends StatelessWidget {
               Text('Назначены пользователю ${controller.session?.username ?? ''}',
                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 24),
+              if (controller.offline) ...[
+                const MessageCard(message: 'Нет связи с сервером. Показаны сохранённые задания; их актуальность не проверена.'),
+                const SizedBox(height: 16),
+              ],
               if (controller.busy) ...[
                 const LinearProgressIndicator(semanticsLabel: 'Загрузка заданий'),
                 const SizedBox(height: 24),
@@ -120,6 +125,27 @@ class _Details extends StatefulWidget {
 
 class _DetailsState extends State<_Details> {
   late Future<DocumentDetails> _details;
+  bool _preparing = false;
+  int _received = 0;
+  String? _pdfError;
+
+  Future<void> _openPdf(DocumentDetails details) async {
+    if (_preparing) return;
+    setState(() { _preparing = true; _received = 0; _pdfError = null; });
+    try {
+      final path = await widget.controller.preparePdf(widget.assignment, details, (bytes) {
+        if (mounted) setState(() => _received = bytes);
+      });
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => PdfScreen(
+        path: path, title: details.title, controller: widget.controller)));
+    } catch (error) {
+      if (mounted) setState(() => _pdfError = error is ApiFailure
+        ? error.message : 'Не удалось открыть PDF. Повторите попытку.');
+    } finally {
+      if (mounted) setState(() => _preparing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -129,7 +155,9 @@ class _DetailsState extends State<_Details> {
   }
 
   void _sessionChanged() {
-    if (widget.controller.session == null && mounted) Navigator.of(context).pop();
+    if (widget.controller.session == null && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
@@ -173,7 +201,23 @@ class _DetailsState extends State<_Details> {
           const SizedBox(height: 8),
           SelectableText(details.checksum),
           const SizedBox(height: 24),
-          const MessageCard(message: 'Карточка загружена с сервера. Скачивание и просмотр PDF ещё не подключены.'),
+          const MessageCard(message: 'PDF сохраняется для просмотра без сети. Перед открытием проверяются размер и SHA-256. Офлайн-доступ действует до окончания текущей сессии.'),
+          const SizedBox(height: 16),
+          if (_pdfError != null) ...[
+            MessageCard(message: _pdfError!, isError: true),
+            const SizedBox(height: 16),
+          ],
+          if (_preparing) ...[
+            LinearProgressIndicator(value: _received == 0 ? null : _received / details.sizeBytes,
+              semanticsLabel: 'Скачивание и проверка PDF'),
+            const SizedBox(height: 8),
+            Text(_received == 0 ? 'Проверка доступа и сохранённого файла…' :
+              'Получено ${(_received / 1048576).toStringAsFixed(2)} МиБ; проверка целостности…'),
+            const SizedBox(height: 16),
+          ],
+          FilledButton.icon(onPressed: _preparing ? null : () => _openPdf(details),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(_preparing ? 'Подготовка PDF…' : 'Скачать / открыть PDF')),
         ]);
       }),
     ]),

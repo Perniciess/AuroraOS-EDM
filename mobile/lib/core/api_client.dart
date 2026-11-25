@@ -3,14 +3,15 @@ import 'dart:convert';
 import 'dart:io';
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.message, {this.status, this.requestId});
+  const ApiFailure(this.message, {this.status, this.requestId, this.network = false});
 
   final String message;
   final int? status;
   final String? requestId;
+  final bool network;
 }
 
-/// JSON-only transport. Never logs credentials or follows authenticated redirects.
+/// Never logs credentials or follows authenticated redirects.
 class ApiClient {
   ApiClient(String endpoint) : _base = _parseEndpoint(endpoint);
 
@@ -90,13 +91,93 @@ class ApiClient {
       });
     } on TimeoutException {
       active?.abort();
-      throw const ApiFailure('Сервер не отвечает. Проверьте связь и повторите.');
+      throw const ApiFailure('Сервер не отвечает. Проверьте связь и повторите.', network: true);
+    } on TlsException {
+      throw const ApiFailure('Не удалось проверить защищённое соединение с сервером.');
     } on IOException {
-      throw const ApiFailure('Нет соединения с сервером. Проверьте сеть.');
+      throw const ApiFailure('Нет соединения с сервером. Проверьте сеть.', network: true);
     } on FormatException {
       throw const ApiFailure('Сервер вернул некорректный ответ.');
     } on TypeError {
       throw const ApiFailure('Ответ сервера не соответствует контракту.');
+    }
+  }
+
+  /// Full restart on retry: partial files are never treated as cached content.
+  Future<void> download(String path, String token, File destination,
+      int expectedSize, void Function(int) onProgress) async {
+    final base = _base;
+    if (base == null) throw const ApiFailure('Укажите HTTPS-адрес сервера в EDM_API_URL.');
+    if (expectedSize <= 0 || expectedSize > 100 * 1024 * 1024) {
+      throw const ApiFailure('Недопустимый размер PDF (максимум 100 МиБ).');
+    }
+    HttpClientRequest? active;
+    var expired = false;
+    final timer = Timer(const Duration(minutes: 5), () {
+      expired = true;
+      active?.abort();
+    });
+    IOSink? sink;
+    try {
+      final request = await _http.getUrl(base.replace(path: path)).then((request) {
+        if (expired) request.abort();
+        return request;
+      }).timeout(const Duration(seconds: 15), onTimeout: () {
+        expired = true;
+        throw TimeoutException('Connection deadline');
+      });
+      active = request;
+      if (expired) throw TimeoutException('Download deadline');
+      request.followRedirects = false;
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      request.headers.set(HttpHeaders.acceptHeader, 'application/pdf');
+      final response = await request.close().timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) {
+        throw ApiFailure(
+          response.statusCode == 404 ? 'Документ больше недоступен.' :
+          response.statusCode == 401 ? 'Сессия истекла. Войдите заново.' :
+          'Не удалось скачать PDF. Повторите попытку.',
+          status: response.statusCode,
+          requestId: response.headers.value('x-request-id'),
+        );
+      }
+      if (response.contentLength != -1 && response.contentLength != expectedSize) {
+        throw const ApiFailure('Размер PDF не соответствует назначенной версии.');
+      }
+      sink = destination.openWrite();
+      // Observe disk errors immediately, including before flush/close.
+      final output = sink;
+      Object? writeError;
+      unawaited(output.done.catchError((Object error) { writeError = error; }));
+      var received = 0;
+      await for (final chunk in response.timeout(const Duration(seconds: 25))) {
+        if (expired) throw TimeoutException('Download deadline');
+        if (writeError != null) throw const ApiFailure('Не удалось сохранить PDF. Проверьте свободное место.');
+        received += chunk.length;
+        if (received > expectedSize) throw const ApiFailure('PDF превышает ожидаемый размер.');
+        output.add(chunk);
+        await output.flush();
+        onProgress(received);
+      }
+      await output.close();
+      sink = null;
+      if (received != expectedSize) throw const ApiFailure('PDF загружен не полностью. Повторите скачивание.');
+    } on TimeoutException {
+      throw const ApiFailure('Скачивание прервано по таймауту. Повторите попытку.', network: true);
+    } on TlsException {
+      throw const ApiFailure('Не удалось проверить защищённое соединение с сервером.');
+    } on SocketException {
+      throw const ApiFailure('Соединение прервано. Повторите скачивание.', network: true);
+    } on HttpException {
+      throw const ApiFailure('Соединение прервано. Повторите скачивание.', network: true);
+    } on FileSystemException {
+      throw const ApiFailure('Не удалось сохранить PDF. Проверьте свободное место.');
+    } finally {
+      timer.cancel();
+      active?.abort();
+      if (sink != null) {
+        try { await sink.close(); } catch (_) { /* Preserve original failure. */ }
+      }
     }
   }
 
