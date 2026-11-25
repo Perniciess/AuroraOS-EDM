@@ -104,3 +104,9 @@ node_modules/
 *.sqlite3-journal
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Локальная документация; корневой README.md сохраняем в Git
+TECHNICAL_CHECKS.md
+/backend/ARCHITECTURE.md
+/**/README.md
+!/README.md

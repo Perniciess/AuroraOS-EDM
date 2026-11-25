@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Documents
+Name[ru]=Документы
+Comment=Corporate document workspace
+Comment[ru]=Рабочее пространство документов
+Icon=ru.auroraos.edm
+Exec=/usr/bin/ru.auroraos.edm
+X-Nemo-Application-Type=silica-qt5
+
+[X-Application]
+Permissions=Internet
+OrganizationName=ru.auroraos
+ApplicationName=edm

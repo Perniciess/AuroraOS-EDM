@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.10)
+project(${FLUTTER_PROJECT_NAME} LANGUAGES CXX)
+
+include(GNUInstallDirs)
+set(BINARY_NAME ${CMAKE_PROJECT_NAME})
+set(FLUTTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/flutter)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_INSTALL_RPATH "\$ORIGIN/../share/${BINARY_NAME}/lib")
+
+add_executable(${BINARY_NAME} main.cpp)
+target_compile_options(${BINARY_NAME} PRIVATE -Wall -Wextra)
+include(flutter/generated_plugins.cmake)
+
+set(PACKAGE_INSTALL_DIR ${CMAKE_INSTALL_DATADIR}/${BINARY_NAME})
+install(FILES ${PROJECT_BINARY_DIR}/bundle/icudtl.dat DESTINATION ${PACKAGE_INSTALL_DIR})
+install(DIRECTORY ${PROJECT_BINARY_DIR}/bundle/flutter_assets DESTINATION ${PACKAGE_INSTALL_DIR})
+install(DIRECTORY ${PROJECT_BINARY_DIR}/bundle/lib DESTINATION ${PACKAGE_INSTALL_DIR})
+install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES desktop/${BINARY_NAME}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES icons/edm.svg RENAME ${BINARY_NAME}.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
