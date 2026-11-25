@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: BSD-3-Clause
 -- +goose Up
 -- Pending uploads exist only inside the import transaction. Rollback is cleanup.
 CREATE TABLE edm.file_uploads (

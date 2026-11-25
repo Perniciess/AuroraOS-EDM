@@ -44,7 +44,6 @@ DISTFILES += \
     rpm/ru.auroraos.ElectronicDocumentManagement.spec \
     AUTHORS.md \
     README.md \
-    LICENSE.BSD-3-Clause.md \
     LICENSE \
 
 

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: BSD-3-Clause
 -- +goose Up
 CREATE TABLE edm.documents (
     id uuid PRIMARY KEY,
