@@ -1,78 +1,160 @@
-# Electronic Document Management
-This project is a document management application using an electronic digital signature
+# AuroraOS EDM
 
-The main purpose is to demonstrate using a minimum of source code to get a correct and extensible application.
+[Русская версия](README.ru.md)
 
-# Terms of Use and Participation
-The source code of the project is provided under the [BSD-3-Clause license](LICENSE), which allows its use in third-party applications.
+Electronic document management for Aurora OS. The project is being rebuilt around
+a Flutter mobile client and a Go backend with PostgreSQL.
 
-The [contributor agreement](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/CONTRIBUTING.md?ref_type=heads) documents the rights granted by contributors of the Open Mobile Platform.?
+The development sequence is mobile document approval, in-app electronic signatures,
+an administration web UI, and a user web UI if needed. Decisions, milestones and
+acceptance criteria are tracked in [ROADMAP.md](ROADMAP.md) (in Russian).
 
-Information about the contributors is specified in the [AUTHORS](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/AUTHORS.md?ref_type=heads) file.
+## Current status
 
-[Code of conduct](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/CODE_OF_CONDUCT.md) is a current set of rules of the Open Mobile
-Platform which informs you how we expect the members of the community will interact
-while contributing and communicating.?
+Stage 1 is in progress: the foundation and the first end-to-end mobile workflow.
 
-# Project structure
-The project has a common structure of an application based on C++ and QML for Aurora OS.
+- **Backend:** personal accounts and sessions, access-controlled assignments,
+  documents and immutable PDF versions, operator CLI for importing PDFs and
+  assigning versions, and streaming downloads with range support.
+- **Mobile:** sign-in and sign-out, a paginated assignment list, and document
+  details for the assigned version. Downloading, private caching, SQLite storage
+  and PDF viewing are under development; offline viewing is not yet a completed
+  end-to-end workflow.
+- **Planned:** approval decisions and reliable synchronization, native integration
+  with a cryptographic provider, server-side signature verification, and web UIs.
 
-- **[client](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/)** the directory containing the client implementation of the application
-	- **[application](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application?ref_type=heads)** directory contains the application
-		- **[ru.auroraos.ElectronicDocumentManagement.pro](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/client/application/ru.auroraos.ElectronicDocumentManagement.pro?ref_type=heads)** file
-		describes the project structure for the qmake build system.
-		- **[icons](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/icons?ref_type=heads)** directory      contains the application icons for different screen resolutions.
-		- **[qml](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml?ref_type=heads)** directory contains the QML source code and the UI resources.
-			- **[assets](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml/assets?ref_type=heads)** the directory contains additional user interface icons.
-			- **[components](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml/components?ref_type=heads)** directory contains the custom UI components.
-			- **[cover](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml/cover?ref_type=heads)** directory contains the application cover implementations.
-			- **[icons](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml/icons?ref_type=heads)** directory contains the additional custom UI icons.
-			- **[pages](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/qml/pages?ref_type=heads)** directory contains the application pages.
-			- **[ElectronicDocumentManagement.qml](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/client/application/qml/ru.auroraos.ElectronicDocumentManagement.qml?ref_type=heads)** file provides the application window implementation.
-		- **[rpm](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/rpm?ref_type=heads)** directory contains the rpm-package build settings.
-			- **[ru.auroraos.ElectronicDocumentManagement.spec](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/client/application/rpm/ru.auroraos.ElectronicDocumentManagement.spec?ref_type=heads)** file is used by rpmbuild tool.
-		- **[src](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/src?ref_type=heads)** directory contains the C++ source code.
-			- **[database](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/src/database?ref_type=heads)** directory contains the database-client implementation
-			- **[pdf](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/src/pdf?ref_type=heads)** directory contains the pdf implementation
-			- **[signature](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/src/signature?ref_type=heads)** directory contains the electronic digital signature implementation
-			- **[websocket](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/src/websocket?ref_type=heads)** directory contains the websocket-client implementatio
-			- **[main.cpp](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/client/application/src/main.cpp?ref_type=heads)** file is the application entry point.
-		- **[translations](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/client/application/translations?ref_type=heads)** directory contains the UI translation files.
-		- **[ru.auroraos.ElectronicDocumentManagement.desktop](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/client/application/ru.auroraos.ElectronicDocumentManagement.desktop?ref_type=heads)** file
-		defines the display and parameters for launching the application.
-- **[server](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/server?ref_type=heads)** the directory containing the server implementation of the application
-	- **[database](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/server/database?ref_type=heads)** directory contains the database-server implementation
-	- **[websocket](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/signature/server/websocket?ref_type=heads)** directory containts the websocket-server implementation
-	- **[main.py](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/server/main.py?ref_type=heads)** file is the entry point to the server application.
+Viewing a document, approving it, signing it and delivering it are separate actions.
+An assignment always refers to an exact immutable document version.
 
-# Compatibility
-The project is compatible with all the supported versions of the Aurora OS.
+## Repository structure
 
-# Installation and assembly
-The project is assembled in the usual way using the Aurora SDK.
+```text
+backend/                    Go backend and operator CLI
+  api/openapi.json          HTTP API contract
+  cmd/api/                  HTTP server entry point
+  cmd/edmctl/               User creation, PDF import and version assignment
+  internal/                 Business modules, adapters and infrastructure
+  compose.yaml              Local PostgreSQL 17
+  ARCHITECTURE.md           Backend architecture and dependency rules
+  README.md                 Backend setup, API, CLI and checks
+mobile/                     Flutter mobile client
+  lib/main.dart             Application entry point and dependency wiring
+  lib/app/                  Application shell and theme
+  lib/core/                 Shared technical code, including the HTTP client
+  lib/features/workspace/   UI, application logic, domain and data access
+  aurora/                   Native runner, CMake, desktop entry and RPM spec
+  test/                     Client tests
+presentation/               Presentation materials
+.github/workflows/          Backend CI
+ROADMAP.md                  Development plan and open technical questions
+```
 
-# Starting the server
+The former C++/QML client (`client/`) and Python/WebSocket server (`server/`)
+are no longer part of the current repository tree. They remain available in Git
+history; the new implementation uses its own architecture and HTTP API.
 
-1. Make sure that you have python version 3.13 installed (this version was used during development).
-2. Open a terminal or command prompt.
-3. Navigate to the directory where the server source code should be located.
-4. Copy the repository.
-5. Run the `cd 2b_1_document_flow` command.
-6. Run the `rm -r client CODE_OF_CONDUCT.md CONTRIBUTING.md README.md README.ru.md` to delete files that are unnecessary for the server. Keep `LICENSE` and `AUTHORS.md` with the source code.
-7. Run the `cd server` command.
-8. Run the `python3 -m venv .venv` command to initialize the Python virtual environment.
-9. Run the `source .venv/bin/activate` command to activate the Python virtual environment.
-10. Run the `pip install -r requirements.txt` command to install the necessary dependencies.
-11. Run the `python3 main.py` command to start the server.
+## Requirements and compatibility
 
-# Functional
-The application has been tested for compliance with the following functionality:
-- The application displays a list of documents on the device.
-- The application allows you to view pdf documents.
-- The application displays the document statuses ("Not viewed", "Viewed", "Signed", "Processed").
-- The application changes the file statuses with appropriate actions.
-- The application allows you to sign a document with an electronic signature.
-- The application allows you to send a signed file to the server over a WebSocket Secure connection.
-- The application allows you to get a list of files from the server.
-- The application allows you to download a file from the server to the device.
-- The application does not display the file located on the server if it is already on the device.
+- **Backend:** Go 1.26+, PostgreSQL 17; Docker Compose for the local database
+  setup below.
+- **Mobile:** Flutter for Aurora OS and Aurora SDK. The Dart SDK constraint is
+  `^3.11.1`; dependencies are listed in [mobile/pubspec.yaml](mobile/pubspec.yaml),
+  including plugins from the Aurora package repository.
+- **Target:** Aurora OS. Supported OS versions, devices and CPU architectures
+  still need to be confirmed. PDF plugins, the cryptographic provider and RPM
+  packaging require validation on the target device. Android/iOS support is not
+  promised for the first release.
+
+## Run the backend locally
+
+From the repository root:
+
+```sh
+cd backend
+export POSTGRES_PASSWORD='local-development-password'
+docker compose up -d --wait
+export DATABASE_URL="postgres://edm:${POSTGRES_PASSWORD}@127.0.0.1:5432/edm?sslmode=disable"
+go run ./cmd/api
+```
+
+The server applies embedded PostgreSQL migrations before accepting requests.
+By default it listens on `127.0.0.1:8080`:
+
+- `GET /healthz` checks the process.
+- `GET /readyz` checks database connectivity.
+
+Configuration is read from the process environment; [backend/.env.example](backend/.env.example)
+lists the variables and is not loaded automatically. `sslmode=disable` in the
+example is for the local database only. Expose the API to the mobile client
+through HTTPS with a certificate trusted by the device.
+
+### Prepare a pilot account and document
+
+In another terminal, use `backend/` as the working directory and set the same
+`DATABASE_URL`:
+
+```sh
+go run ./cmd/edmctl create-user USERNAME
+```
+
+The command reads the password from stdin (12–1024 bytes) and prints the user's
+ID and username. There is no public registration. To prepare an assignment:
+
+```sh
+go run ./cmd/edmctl import-pdf \
+  -operation '<operation-uuid>' -title 'Document' \
+  -assignee '<user-uuid>' /private/path/document.pdf
+```
+
+Replace the placeholders with UUIDs and a local PDF path. Keep the same operation
+UUID, parameters and file for retries. The pilot stores PDF content in PostgreSQL;
+the maximum file size is 100 MiB. See [backend/README.md](backend/README.md) for
+new versions, additional assignments, API behavior and integration tests.
+
+## Run the mobile client
+
+With Flutter for Aurora OS configured, run from the repository root:
+
+```sh
+cd mobile
+flutter pub get
+flutter devices
+flutter run -d '<device-id>' --dart-define=EDM_API_URL=https://edm.example.org
+```
+
+Replace the device ID and server address. `EDM_API_URL` must be the HTTPS origin
+of your API, without `/api/v1`, credentials, query parameters or a fragment.
+The client does not accept plain HTTP or bypass certificate verification.
+Sign in using the account created with `edmctl`.
+
+## Development checks
+
+Backend commands, run from `backend/`:
+
+```sh
+go test ./...
+go vet ./...
+go build ./...
+```
+
+Database integration tests require `TEST_DATABASE_URL` pointing to a disposable
+test database; without it they are skipped. The
+[backend workflow](.github/workflows/backend.yml) runs checks with PostgreSQL 17
+and produces Linux/amd64 builds of `api` and `edmctl`.
+
+Mobile commands, run from `mobile/` with the Aurora Flutter toolchain:
+
+```sh
+flutter analyze
+flutter test
+```
+
+These checks do not establish device compatibility or validate RPM installation
+and signing; those checks remain part of the target-device integration work.
+
+## License and participation
+
+The repository license is [BSD-3-Clause](LICENSE). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for contribution terms,
+[AUTHORS.md](AUTHORS.md) for contributors, and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.

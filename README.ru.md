@@ -1,77 +1,162 @@
-# Описание приложения
-Приложение Aurora OS, позволяющее необходимый функционал для работы с документами в электронном виде с использованием цифровой подписи.
+# AuroraOS EDM
 
-Основная цель - продемонстрировать, как с помощью минимума исходного кода можно получить корректное и расширяемое приложение.
+[English version](README.md)
 
-# Условия использования и участия
-Исходный код проекта предоставляется по [лицензии BSD-3-Clause](LICENSE), которая позволяет использовать его в сторонних приложениях.
+Электронный документооборот для ОС Аврора. Проект перерабатывается с нуля:
+мобильный клиент на Flutter и сервер на Go с PostgreSQL.
 
-Соглашение участника [(документ на английском)](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/CONTRIBUTING.md?ref_type=heads) регламентирует права,
-предоставляемые участниками компании «Открытая Мобильная Платформа».
+Последовательность развития: мобильное согласование документов, электронная
+подпись внутри приложения, веб-панель администратора и пользовательская
+веб-версия при необходимости. Решения, этапы и критерии готовности описаны
+в [ROADMAP.md](ROADMAP.md).
 
-Информация об участниках указана в файле [AUTHORS](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/AUTHORS.md?ref_type=heads).
+## Текущее состояние
 
-Кодекс поведения  [(документ на английском)](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/CODE_OF_CONDUCT.md) — это действующий набор
-правил компании «Открытая Мобильная Платформа», который информирует об ожиданиях по
-взаимодействию между членами сообщества при общении и работе над проектами.
+В работе этап 1: новый фундамент и первый сквозной мобильный сценарий.
 
-# Структура проекта
-Проект имеет стандартную структуру приложения на базе C++ и QML для ОС Аврора.
+- **Сервер:** персональные учётные записи и сессии, задания с проверкой прав,
+  документы и неизменяемые версии PDF, служебная CLI для импорта PDF и назначения
+  версий, потоковое скачивание с поддержкой диапазонов.
+- **Мобильный клиент:** вход и выход, список заданий с пагинацией, карточка
+  документа с данными назначенной версии. Скачивание, приватный кеш, SQLite
+  и просмотр PDF находятся в разработке; сквозной сценарий офлайн-просмотра
+  ещё не завершён.
+- **В планах:** решения по согласованию и надёжная синхронизация, нативная
+  интеграция с криптопровайдером, серверная проверка подписи и веб-интерфейсы.
 
-- Каталог **[client](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/)** содержит клиентскую реализацию приложения.
-	- Каталог **[application](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application?ref_type=heads)** содержит исходный код приложения
-		- Файл **[ru.auroraos.ElectronicDocumentManagement.pro](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/client/application/ru.auroraos.ElectronicDocumentManagement.pro?ref_type=heads)** описывает структура проекта для системы сборки qmake.
-		- Каталог **[icons](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/icons?ref_type=heads)** содержит иконки приложения для поддерживаемых разрешений экрана.
-		- Каталог **[qml](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml?ref_type=heads)** содержит исходный код на QML и ресурсы интерфейса пользователя.
-			- Каталог **[assets](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml/assets?ref_type=heads)** содержит дополнительные значки пользовательского интерфейса.
-			- Каталог **[components](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml/components?ref_type=heads)** содержит пользовательские компоненты пользовательского интерфейса.
-			- Каталог **[cover](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml/cover?ref_type=heads)** содержит реализации обложек приложения.
-			- Каталог **[icons](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml/icons?ref_type=heads)** содержит дополнительные иконки интерфейса пользователя.
-			- Каталог **[pages](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/qml/pages?ref_type=heads)** содержит страницы приложения.
-			- Файл **[ElectronicDocumentManagement.qml](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/client/application/qml/ru.auroraos.ElectronicDocumentManagement.qml?ref_type=heads)** предоставляет реализацию окна приложения.
-		- Каталог **[rpm](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/rpm?ref_type=heads)** содержит настройки сборки rpm-пакета.
-			- Файл **[ru.auroraos.ElectronicDocumentManagement.spec](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/client/application/rpm/ru.auroraos.ElectronicDocumentManagement.spec?ref_type=heads)** используется инструментом rpmbuild.
-		- Каталог **[src](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/src?ref_type=heads)** содержит исходный код на C++.
-			- Каталог **[database](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/src/database?ref_type=heads)** содержит клиентскую реализацию базы данных
-			- Каталог **[pdf](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/src/pdf?ref_type=heads)** содержит реализацию работы с pdf-файлами.
-			- Каталог **[main](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/src/main?ref_type=heads)** содержит реализацию работы с ЭЦП.
-			- Каталог **[websocket](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/src/websocket?ref_type=heads)** содержит реализацию работы с вебсокетом.
-			- Файл **[main.cpp](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/client/application/src/main.cpp?ref_type=heads)** является точкой входа в приложение.
-		- Каталог **[translations](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/client/application/translations?ref_type=heads)** содержит файлы перевода интерфейса пользователя.
-		- Файл **[ru.auroraos.ElectronicDocumentManagement.desktop](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/client/application/ru.auroraos.ElectronicDocumentManagement.desktop?ref_type=heads)** определяет отображение и параметры запуска приложения.
-- Каталог **[server](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/server?ref_type=heads)** содержит исходный код сервера.
-	- Каталог **[database](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/server/database?ref_type=heads)** содержит реализацию базы данных на сервере.
-	- Каталог **[websocket](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/tree/main/server/websocket?ref_type=heads)** содержит реализацию работы с вебсокетом.
-	- Файл **[main.py](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/main/server/main.py?ref_type=heads)** является точкой входа в серверное приложение.
+Просмотр, согласование, подписание и доставка документа — отдельные действия.
+Задание всегда относится к точной неизменяемой версии документа.
 
-# Совместимость
-Проект совместим с актуальными версиями ОС Аврора.
+## Структура репозитория
 
-# Установка и сборка
-Проект собирается обычным образом с помощью Аврора SDK.
+```text
+backend/                    Сервер на Go и служебная CLI
+  api/openapi.json          Контракт HTTP API
+  cmd/api/                  Точка входа HTTP-сервера
+  cmd/edmctl/               Создание пользователей, импорт PDF и назначение версий
+  internal/                 Бизнес-модули, адаптеры и инфраструктура
+  compose.yaml              Локальная PostgreSQL 17
+  ARCHITECTURE.md           Архитектура сервера и правила зависимостей
+  README.md                 Запуск сервера, API, CLI и проверки
+mobile/                     Мобильный клиент на Flutter
+  lib/main.dart             Точка входа и сборка зависимостей
+  lib/app/                  Оболочка приложения и тема
+  lib/core/                 Общий технический код, включая HTTP-клиент
+  lib/features/workspace/   UI, прикладная логика, модель и доступ к данным
+  aurora/                   Нативная оболочка, CMake, desktop-файл и RPM spec
+  test/                     Тесты клиента
+presentation/               Материалы презентации
+.github/workflows/          CI серверной части
+ROADMAP.md                  План развития и открытые технические вопросы
+```
 
-# Запуск сервера
+Прежний C++/QML-клиент (`client/`) и Python/WebSocket-сервер (`server/`)
+отсутствуют в текущем дереве репозитория. Их исходники доступны в истории Git;
+новая реализация использует собственную архитектуру и HTTP API.
 
-1. Убедитесь, что у вас установлен python версии 3.13 (данная версия использовалась при разработке).
-2. Откройте терминал или командную строку.
-3. Перейдите в каталог, в котором должен будет находится исходный код сервера.
-4. Скопируйте репозиторий.
-5. Выполните команду `cd 2b_1_document_flow`.
-6. Выполните команду `rm -r client CODE_OF_CONDUCT.md CONTRIBUTING.md README.md README.ru.md`, чтобы удалить ненужные для сервера файлы. Сохраните `LICENSE` и `AUTHORS.md` вместе с исходным кодом.
-7. Выполните команду `cd server`.
-8. Выполните команду `python3 -m venv .venv`, чтобы инициализировать виртуальное окружение Python.
-9. Выполните команду `source .venv/bin/activate`, чтобы активировать виртуальное окружение Python.
-10. Выполните команду `pip install -r requirements.txt`, чтобы установить необходимые зависимости.
-11. Выполните команду `python3 main.py`, чтобы запустить сервер.
+## Требования и совместимость
 
-# Функционал
-Приложение было протестировано на соответствие следующему функционалу:
-- Приложение отображает список документов, находящихся на устройстве.
-- Приложение позволяет просматривать pdf документы.
-- Приложение отображает статусы документов ("Не просмотрено", "Просмотрено", "Подписано", "Обработано").
-- Приложение меняет статусы файлов при соответствующих действиях.
-- Приложение позволяет подписать документ электронной подписью.
-- Приложение позволяет отправить подписанный файл на сервер по WebSocket Secure соединению.
-- Приложение позволяет получить список файлов с сервера.
-- Приложение позволяет скачать файл с сервера на устройство.
-- Приложение не отображает файл, находящийся на сервере, если он уже есть на устройстве.
+- **Сервер:** Go 1.26+, PostgreSQL 17; Docker Compose для описанного ниже
+  запуска локальной БД.
+- **Клиент:** Flutter для ОС Аврора и Аврора SDK. Ограничение версии Dart SDK —
+  `^3.11.1`; зависимости перечислены в [mobile/pubspec.yaml](mobile/pubspec.yaml),
+  включая плагины из репозитория пакетов Авроры.
+- **Целевая платформа:** ОС Аврора. Поддерживаемые версии ОС, устройства
+  и архитектуры CPU ещё предстоит подтвердить. PDF-плагины, криптопровайдер
+  и RPM-пакет требуют проверки на целевом устройстве. Поддержка Android/iOS
+  в первом выпуске не заявлена.
+
+## Локальный запуск сервера
+
+Из корня репозитория:
+
+```sh
+cd backend
+export POSTGRES_PASSWORD='local-development-password'
+docker compose up -d --wait
+export DATABASE_URL="postgres://edm:${POSTGRES_PASSWORD}@127.0.0.1:5432/edm?sslmode=disable"
+go run ./cmd/api
+```
+
+Перед приёмом запросов сервер применяет встроенные миграции PostgreSQL.
+По умолчанию он слушает `127.0.0.1:8080`:
+
+- `GET /healthz` проверяет работоспособность процесса.
+- `GET /readyz` проверяет подключение к БД.
+
+Конфигурация читается из окружения процесса; переменные перечислены
+в [backend/.env.example](backend/.env.example), который автоматически не загружается.
+`sslmode=disable` в примере допустим только для локальной БД. Для подключения
+мобильного клиента опубликуйте API через HTTPS с сертификатом, которому
+доверяет устройство.
+
+### Подготовка учётной записи и документа для пилота
+
+В другом терминале перейдите в `backend/` и задайте тот же `DATABASE_URL`:
+
+```sh
+go run ./cmd/edmctl create-user USERNAME
+```
+
+Команда читает пароль из stdin (12–1024 байта) и выводит ID и имя пользователя.
+Публичной регистрации нет. Чтобы подготовить задание:
+
+```sh
+go run ./cmd/edmctl import-pdf \
+  -operation '<operation-uuid>' -title 'Документ' \
+  -assignee '<user-uuid>' /private/path/document.pdf
+```
+
+Подставьте UUID и путь к локальному PDF. Для повторов сохраняйте тот же UUID
+операции, параметры и файл. В пилоте содержимое PDF хранится в PostgreSQL;
+максимальный размер файла — 100 МиБ. Создание новых версий, дополнительные
+назначения, поведение API и интеграционные тесты описаны в
+[backend/README.md](backend/README.md).
+
+## Запуск мобильного клиента
+
+После настройки Flutter для ОС Аврора выполните из корня репозитория:
+
+```sh
+cd mobile
+flutter pub get
+flutter devices
+flutter run -d '<device-id>' --dart-define=EDM_API_URL=https://edm.example.org
+```
+
+Подставьте ID устройства и адрес сервера. `EDM_API_URL` должен содержать
+HTTPS-адрес API без `/api/v1`, учётных данных, параметров запроса и фрагмента.
+Клиент не принимает обычный HTTP и не отключает проверку сертификата.
+Для входа используйте учётную запись, созданную через `edmctl`.
+
+## Проверки при разработке
+
+Команды сервера выполняются из `backend/`:
+
+```sh
+go test ./...
+go vet ./...
+go build ./...
+```
+
+Интеграционные тесты БД требуют `TEST_DATABASE_URL`, указывающего на одноразовую
+тестовую БД; без переменной они пропускаются.
+[Серверный workflow](.github/workflows/backend.yml) выполняет проверки
+с PostgreSQL 17 и создаёт сборки `api` и `edmctl` для Linux/amd64.
+
+Команды клиента выполняются из `mobile/` с инструментарием Flutter для Авроры:
+
+```sh
+flutter analyze
+flutter test
+```
+
+Эти проверки не подтверждают совместимость с устройством, установку и подпись
+RPM; соответствующие проверки остаются частью интеграции на целевой платформе.
+
+## Лицензия и участие
+
+Лицензия репозитория — [BSD-3-Clause](LICENSE). Условия участия приведены в
+[CONTRIBUTING.md](CONTRIBUTING.md), сведения об авторах — в
+[AUTHORS.md](AUTHORS.md), правила взаимодействия — в
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
