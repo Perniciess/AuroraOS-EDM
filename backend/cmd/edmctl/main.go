@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BSD-3-Clause
 
 // edmctl provisions pilot accounts, documents and assignments through trusted DB access.
 package main

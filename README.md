@@ -4,7 +4,7 @@ This project is a document management application using an electronic digital si
 The main purpose is to demonstrate using a minimum of source code to get a correct and extensible application.
 
 # Terms of Use and Participation
-The source code of the project is provided under the [license](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/LICENSE?ref_type=heads), which allows its use in third-party applications.
+The source code of the project is provided under the [BSD-3-Clause license](LICENSE), which allows its use in third-party applications.
 
 The [contributor agreement](https://gitlab.com/mobiledevelopment2025/workshop/2b_1_document_flow/-/blob/signature/CONTRIBUTING.md?ref_type=heads) documents the rights granted by contributors of the Open Mobile Platform.?
 
@@ -58,7 +58,7 @@ The project is assembled in the usual way using the Aurora SDK.
 3. Navigate to the directory where the server source code should be located.
 4. Copy the repository.
 5. Run the `cd 2b_1_document_flow` command.
-6. Run the `rm -r client AUTHORS.md CODE_OF_CONDUCT.md CONTRIBUTING.md LICENSE LICENSE.BSD-3-Clause.md README.md README.ru.md` to delete files that are unnecessary for the server.
+6. Run the `rm -r client CODE_OF_CONDUCT.md CONTRIBUTING.md README.md README.ru.md` to delete files that are unnecessary for the server. Keep `LICENSE` and `AUTHORS.md` with the source code.
 7. Run the `cd server` command.
 8. Run the `python3 -m venv .venv` command to initialize the Python virtual environment.
 9. Run the `source .venv/bin/activate` command to activate the Python virtual environment.
@@ -76,4 +76,3 @@ The application has been tested for compliance with the following functionality:
 - The application allows you to get a list of files from the server.
 - The application allows you to download a file from the server to the device.
 - The application does not display the file located on the server if it is already on the device.
-
