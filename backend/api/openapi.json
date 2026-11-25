@@ -1,0 +1,364 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AuroraOS EDM API",
+    "version": "0.4.0",
+    "description": "Pilot accounts, PostgreSQL-backed bearer sessions, assignment-scoped metadata and streaming PDF downloads. HTTPS is required outside local development. Accounts, PDF imports and assignments are provisioned using edmctl; public registration and HTTP upload are not available. Imports are limited to 100 MiB, perform header/EOF checks (not full PDF structure validation) and compute SHA-256. Errors use the Error schema; unknown paths return 404 and unsupported methods return 405."
+  },
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Authenticate and create a 24-hour session",
+        "description": "Username is trimmed and lowercased (ASCII). Maximum JSON body size is 8192 bytes. Ten login attempts per normalized username per 15-minute window, shared across instances and including successful attempts. Password checks are additionally concurrency-limited per process. Missing, invalid, unknown and disabled credentials return the same 401 response.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object", "required": ["username", "password"], "additionalProperties": false,
+            "properties": {
+              "username": { "type": "string", "description": "Canonical form: [a-z0-9][a-z0-9_.-]{2,63}" },
+              "password": { "type": "string", "format": "password", "writeOnly": true, "description": "1–1024 UTF-8 bytes for login; new accounts require at least 12 bytes. No trimming or Unicode normalization." }
+            }
+          } } }
+        },
+        "responses": {
+          "200": {
+            "description": "New independent session; token is returned only here. Cache-Control: no-store.",
+            "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/BodyTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Revoke the supplied session",
+        "description": "Idempotent: a well-formed token already expired, unknown or revoked also returns 204. Other sessions are unaffected. A lost login response requires a fresh login; login itself is not idempotent.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Session absent or revoked. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Return the account for an active session",
+        "description": "Checks session expiry and account disabled state in PostgreSQL on every request. No user identifier is accepted from the client.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Current user. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "operationId": "listAssignments",
+        "summary": "List the current user's pending assignments",
+        "description": "Only pending assignments are visible. UUID ascending keyset pagination; next_after is omitted on the last page. Pass next_after as after on the next request. Each page reflects current grants, not a snapshot or a synchronization cursor; new assignments with smaller UUIDs require a fresh listing. Ownership always comes from the session; extra query parameters cannot change the assignee. Cache-Control: no-store.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+          { "name": "after", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Exclusive assignment ID cursor. Omit to start again." }
+        ],
+        "responses": {
+          "200": { "description": "Bounded page; items is an empty array for an empty inbox. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentPage" } } } },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/assignments/{id}": {
+      "get": {
+        "operationId": "getAssignment",
+        "summary": "Read an owned pending assignment",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ObjectID" }],
+        "responses": {
+          "200": { "description": "Assignment bound to one exact version. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}": {
+      "get": {
+        "operationId": "getDocument",
+        "summary": "Read a document card through a pending assignment",
+        "description": "Requires a pending assignment to at least one version of this document. Does not enumerate or grant access to other versions.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ObjectID" }],
+        "responses": {
+          "200": { "description": "Document card. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Document" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions/{versionID}": {
+      "get": {
+        "operationId": "getDocumentVersion",
+        "summary": "Read metadata of an assigned immutable PDF version",
+        "description": "Requires a pending assignment to this exact version and a matching document ID. Returns metadata only, not file bytes or a storage path. Cancelling the last applicable assignment removes access on the next request.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectID" },
+          { "name": "versionID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Immutable version metadata. Cache-Control: no-store.", "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentVersion" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions/{versionID}/content": {
+      "get": {
+        "operationId": "downloadDocumentVersion",
+        "summary": "Stream the exact assigned immutable PDF, with byte-range resume",
+        "description": "Checks the active session and a pending assignment to this exact document/version on every request, including conditional/range requests. Revocation takes effect on the next request; an already started response is not recalled. Maximum stored file size is 104857600 bytes. Download context is limited to 25 seconds (server write timeout 30 seconds); interrupted responses must be resumed/retried and verified against the metadata size and SHA-256 before use. A missing blob behind accessible metadata is an internal error, not 404. Cache-Control: no-store; Content-Disposition uses the version UUID, never a supplied filename. If-Range accepts the strong SHA-256 ETag; a mismatch returns the full file. HTTP upload is intentionally absent in this pilot.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectID" },
+          { "name": "versionID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Range", "in": "header", "schema": { "type": "string" }, "description": "HTTP byte range, e.g. bytes=1048576-. Each retry rechecks access." },
+          { "name": "If-Range", "in": "header", "schema": { "type": "string" }, "description": "Quoted SHA-256 ETag of the partial local file." },
+          { "name": "If-Match", "in": "header", "schema": { "type": "string" } },
+          { "name": "If-None-Match", "in": "header", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete PDF. X-Content-Type-Options: nosniff; Cache-Control: no-store; Content-Disposition: attachment with UUID filename.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+              "ETag": { "schema": { "type": "string" }, "description": "Strong ETag: quoted lowercase SHA-256." },
+              "Accept-Ranges": { "schema": { "type": "string", "enum": ["bytes"] } },
+              "Content-Length": { "schema": { "type": "integer", "format": "int64" } }
+            },
+            "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "206": {
+            "description": "Requested byte range, or multipart/byteranges for multiple ranges. Same immutable ETag and no-store policy as 200.",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+              "ETag": { "schema": { "type": "string" } },
+              "Content-Range": { "schema": { "type": "string" }, "description": "bytes START-END/TOTAL for a single range." }
+            },
+            "content": {
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } },
+              "multipart/byteranges": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "304": { "description": "If-None-Match matched the immutable ETag; no body. Session and object rights were checked." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "description": "If-Match failed: error.code is precondition_failed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "416": { "description": "Invalid or unsatisfiable byte range: error.code is invalid_range.", "headers": { "Content-Range": { "schema": { "type": "string" }, "description": "bytes */TOTAL when the range is beyond the file." } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "HTTP process liveness; does not check database readiness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "HTTP process is running",
+            "headers": {
+              "X-Request-ID": { "$ref": "#/components/headers/RequestID" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": { "status": { "type": "string", "enum": ["ok"] } }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Database readiness; checks PostgreSQL with a two-second timeout",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "PostgreSQL is available; startup migrations have completed",
+            "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": { "status": { "type": "string", "enum": ["ok"] } }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/NotReady" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ObjectID": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Opaque 32-byte random token, unpadded base64url (43 characters). Not JWT; never send in query parameters." }
+    },
+    "headers": {
+      "RequestID": {
+        "description": "Request correlation identifier, also present in error responses",
+        "schema": { "type": "string", "minLength": 1 }
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object", "required": ["id", "title", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DocumentVersion": {
+        "type": "object", "required": ["id", "document_id", "number", "media_type", "size_bytes", "checksum_algorithm", "checksum", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "document_id": { "type": "string", "format": "uuid" },
+          "number": { "type": "integer", "format": "int64", "minimum": 1 },
+          "media_type": { "type": "string", "enum": ["application/pdf"] },
+          "size_bytes": { "type": "integer", "format": "int64", "minimum": 1 },
+          "checksum_algorithm": { "type": "string", "enum": ["sha256"] },
+          "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Assignment": {
+        "type": "object", "required": ["id", "document_id", "version_id", "status", "revision", "created_at"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "document_id": { "type": "string", "format": "uuid" },
+          "version_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["pending"] },
+          "revision": { "type": "integer", "format": "int64", "minimum": 1 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AssignmentPage": {
+        "type": "object", "required": ["items"], "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Assignment" } },
+          "next_after": { "type": "string", "format": "uuid" }
+        }
+      },
+      "User": {
+        "type": "object", "required": ["id", "username"], "additionalProperties": false,
+        "properties": { "id": { "type": "string", "format": "uuid" }, "username": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{2,63}$" } }
+      },
+      "Session": {
+        "type": "object", "required": ["access_token", "token_type", "expires_at", "user"], "additionalProperties": false,
+        "properties": {
+          "access_token": { "type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{43}$" },
+          "token_type": { "type": "string", "enum": ["Bearer"] },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "request_id"],
+            "additionalProperties": false,
+            "properties": {
+              "code": { "type": "string", "minLength": 1 },
+              "message": { "type": "string", "minLength": 1 },
+              "request_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "InvalidRequest": {
+        "description": "Malformed login JSON, unknown login properties, more than one JSON value, invalid or repeated pagination parameters: error.code is invalid_request",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Invalid credentials, missing/malformed bearer header, unknown/revoked/expired session or disabled account: error.code is unauthorized",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" }, "WWW-Authenticate": { "schema": { "type": "string", "enum": ["Bearer"] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "BodyTooLarge": {
+        "description": "Login request exceeds 8192 bytes: error.code is body_too_large",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "UnsupportedMediaType": {
+        "description": "Login requires application/json: error.code is unsupported_media_type",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "Login attempt quota or password-check concurrency exhausted: error.code is rate_limited",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" }, "Retry-After": { "description": "Conservative retry delay in seconds", "schema": { "type": "integer", "enum": [900] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotReady": {
+        "description": "PostgreSQL unavailable or check timed out: error.code is not_ready (503)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Unknown path, malformed object UUID, missing object, another user's object, cancelled assignment or unassigned version: identical error.code not_found and message Resource not found (404)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "MethodNotAllowed": {
+        "description": "Unsupported method on a known path: error.code is method_not_allowed (405)",
+        "headers": {
+          "X-Request-ID": { "$ref": "#/components/headers/RequestID" },
+          "Allow": { "description": "Supported HTTP methods", "schema": { "type": "string" } }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "InternalError": {
+        "description": "Internal failure: error.code is internal_error (500)",
+        "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestID" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}
