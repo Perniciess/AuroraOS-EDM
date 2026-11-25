@@ -18,5 +18,8 @@ install(DIRECTORY ${PROJECT_BINARY_DIR}/bundle/flutter_assets DESTINATION ${PACK
 install(DIRECTORY ${PROJECT_BINARY_DIR}/bundle/lib DESTINATION ${PACKAGE_INSTALL_DIR})
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES desktop/${BINARY_NAME}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES icons/edm.svg RENAME ${BINARY_NAME}.svg
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+foreach(ICON_SIZE 86 108 128 172)
+    install(FILES icons/${ICON_SIZE}x${ICON_SIZE}/ru.auroraos.ElectronicDocumentManagement.png
+            RENAME ${BINARY_NAME}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${ICON_SIZE}x${ICON_SIZE}/apps)
+endforeach()
